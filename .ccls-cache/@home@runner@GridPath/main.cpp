@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <algorithm>
 #include <math.h>
+#include <chrono>
+
 
 using namespace std;
 
@@ -48,6 +50,20 @@ class Grid{
     }
     Node getNode(pair<int,int> position){return Maze[position];}
     int getSize(){return Gridsize;}
+    void printHeight(){
+      for(int z=0;z<Gridsize;z++){printf("----");}
+      printf("-");
+      for(int i=0;i<Gridsize;i++){
+        cout<<endl<<"|";
+        for(int u=0;u<Gridsize;u++){
+          printf("%3d|", Maze[make_pair(i,u)].getHeight());
+        }
+        cout<<endl;
+        for(int z=0;z<Gridsize;z++){printf("----");}
+        printf("-");
+        cout<<endl;
+      }
+    }
 };
 
 class Player{
@@ -68,6 +84,23 @@ class Player{
     Player(){
       init();
     }
+    void printInfo(){
+      this->printSad();
+      this->printPath();
+    }
+    void printPos(){
+      cout<<currentPosition.first<<":"<<currentPosition.second<<endl;
+    }
+    void printSad(){
+      cout<<"SadValue:"<<SadValue<<endl;
+    }
+    void printPath(){
+      cout<< "Path:\n";
+      for(int i=0;i<Path.size();i++){
+        printf("x:%d,y:%d\n",Path[i].first,Path[i].second);
+      }
+    }
+    int getPathSize(){return Path.size();}
     void init(){
       currentPosition = make_pair(-1,-1);
       currentPlayground = new Grid();
@@ -80,7 +113,7 @@ class Player{
       //move more than one step
       if(CountNumofStep(destination)>1){return false;}
       //stepped before
-      if(find(Path.begin(),Path.end(),destination)!=Path.end()){return true;}
+      if(find(Path.begin(),Path.end(),destination)!=Path.end()){return false;}
       return true;
     }
     bool Checkcoordinate(int destination){
@@ -109,7 +142,6 @@ class Player{
         return ; 
       }
       SadValue+=checkSadValue(destination);
-      Path.push_back(destination);
       SetPosition(destination);
       return;
     }  
@@ -120,19 +152,59 @@ class PathFinder: public Player{
     PathFinder(pair<int,int> startPoint,Grid *Playground):Player(Playground){
       SetPosition(startPoint);
     }
-    void printPos(){
-      cout<<currentPosition.first<<":"<<currentPosition.second<<endl;
+    PathFinder(PathFinder * cloneTarget){
+      currentPosition = cloneTarget->currentPosition;
+      currentPlayground = cloneTarget->currentPlayground;
+      Path = cloneTarget->Path;
+      SadValue = cloneTarget->SadValue;
     }
-  
+    
+    
+    PathFinder PathFind(){
+      if(Path.size()>=pow(currentPlayground->getSize(),2)){
+        return *this;
+      }
+      int minSadValue = pow(currentPlayground->getSize(),2)+1;
+      PathFinder * minSadptr = new PathFinder(*this);
+      minSadptr->SadValue = minSadValue;
+      PathFinder up(this->CloneMove(make_pair(currentPosition.first,currentPosition.second+1))),
+      down(this->CloneMove(make_pair(currentPosition.first,currentPosition.second-1))),
+      left(this->CloneMove(make_pair(currentPosition.first-1,currentPosition.second))),
+      right(this->CloneMove(make_pair(currentPosition.first+1,currentPosition.second)));
+      if(CheckValidMove(make_pair(currentPosition.first,currentPosition.second+1))){
+        up = up.PathFind();
+        if(up.SadValue<minSadValue && up.currentPosition!= currentPosition){minSadValue =up.SadValue;minSadptr = &up;}
+      }
+      if(CheckValidMove(make_pair(currentPosition.first,currentPosition.second-1))){
+        down= down.PathFind();
+        if(down.SadValue<minSadValue && down.currentPosition!= currentPosition){minSadValue =down.SadValue;minSadptr = &down;}
+      }
+      if(CheckValidMove(make_pair(currentPosition.first-1,currentPosition.second))){
+        left=left.PathFind();
+
+        if(left.SadValue<minSadValue&& left.currentPosition!= currentPosition){minSadValue =left.SadValue;minSadptr = &left;}
+      }
+      if(CheckValidMove(make_pair(currentPosition.first+1,currentPosition.second))){
+        right = right.PathFind();
+
+        if(right.SadValue<minSadValue && right.currentPosition!= currentPosition){minSadValue =right.SadValue;minSadptr = &right;}
+      }
+      return new PathFinder(*minSadptr);
+    }
+    PathFinder CloneMove(pair<int,int> dest){
+      PathFinder returnTemp(*this);
+      returnTemp.move(dest);
+      return returnTemp;
+    }
 };
 int main() {
+  auto start = std::chrono::high_resolution_clock::now();
+  //size nxn 
   Grid playground(3);
   playground.testDataInit();
   PathFinder test(make_pair(0,0),&playground);
-  test.move(make_pair(1,0));
-  test.printPos();
-  test.SetPosition(make_pair(2,0));
-  test.printPos();
-  
-  cout << "Hello World\n";  
+  test.PathFind();
+  auto stop = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+  printf("runtime(in mileseconds): %ld\n",duration.count()); 
 }
